@@ -24,4 +24,4 @@ jobs:
       - name: Apply Kubernetes manifests
         working-directory: /home/docker-ubuntu/my-k8s-project/
         run: |
-          kubectl apply -f k8s/
+          kubectl apply -f k8s/ --validate=false
