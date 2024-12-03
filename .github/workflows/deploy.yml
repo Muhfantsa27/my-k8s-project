@@ -22,6 +22,8 @@ jobs:
       run: |
         mkdir -p ~/.kube
         echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+      env:
+        KUBECONFIG_SECRET: ${{ secrets.KUBECONFIG }}
 
     - name: Deploy to Kubernetes
       run: |
