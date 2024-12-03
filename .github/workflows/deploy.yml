@@ -18,4 +18,8 @@ jobs:
           ls -l
 
       - name: Apply Kubernetes manifests
-        run: kubectl apply -f k8s/
+        working-directory: my-k8s-project
+        run: |
+          kubectl apply -f deployment.yaml
+          kubectl apply -f service.yaml
+
