@@ -18,7 +18,6 @@ jobs:
           ls -la
 
       - name: Apply Kubernetes manifests
-        working-directory: my-k8s-project
+        working-directory: /home/docker-ubuntu/my-k8s-project/
         run: |
-          kubectl apply -f deployment.yaml
-          kubectl apply -f service.yaml
+          kubectl apply -f k8s/
