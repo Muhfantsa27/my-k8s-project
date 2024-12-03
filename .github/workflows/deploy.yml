@@ -9,14 +9,13 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Configure kubeconfig
+      - name: Verify folder existence
         run: |
-          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          echo "Current working directory: $(pwd)"
+          ls -l
 
       - name: Apply Kubernetes manifests
-        run: |
-          kubectl apply -f k8s/
+        run: kubectl apply -f k8s/
