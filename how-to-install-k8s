@@ -1,0 +1,264 @@
+# Installation & Setup
+
+Jump Host : ssh ptiadmin@10.3.182.65
+
+## Install Haproxy Keepalived
+
+```
+1. apt install haproxy keepalived
+2. update config /etc/haproxy/haproxy.cfg
+3. update config /etc/keepalived/keepalived.conf
+4. ansible-playbook -i hosts ansible.yml -e "host=10.3.24.8"
+5. ansible-playbook -i hosts ansible.yml -e "host=10.3.24.9"
+6. ansible-playbook -i hosts ansible.yml -e "host=10.3.24.10"
+```
+
+## Install Kubernete Master Worker
+
+```
+1. ansible-playbook ansible_master.yml
+2. ansible-playbook ansible_worker.yml
+```
+
+## Install Kubernete Cluster
+
+```
+1. yum install -y yum-utils
+2. yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+3. yum install docker-ce-20.10.12 docker-ce-cli-20.10.12 containerd.io
+4. Disable selinux, swap memory & firewalld
+5. add config /etc/sysctl.d/k8s.conf
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+6. sysctl --system
+7. add config /etc/yum.repos.d/kubernetes.repo
+   [kubernetes]
+   name=Kubernetes
+   baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch
+   enabled=1
+   gpgcheck=1
+   repo_gpgcheck=1
+   gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+7. yum install kubeadm-1.23.3-0 kubelet-1.23.3-0 kubectl-1.23.3-0 -y
+8. sudo containerd config default | sudo tee /etc/containerd/config.toml
+9. sudo nano /etc/containerd/config.toml set SystemdCgroup = true
+10. systemctl restart containerd
+11. rm -Rf /var/lib/kubelet
+12. mkdir -p /var/opt/k8s/kubelet/
+13. ln -s /var/opt/k8s/kubelet/ /var/lib/kubelet
+14. kubeadm init --control-plane-endpoint=10.3.24.7 --apiserver-advertise-address=10.3.24.8 --pod-network-cidr=10.244.0.0/16 --upload-certs
+15. mkdir -p $HOME/.kube
+16. sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+17. sudo chown $(id -u):$(id -g) $HOME/.kube/config
+18. kubeadm token list
+19. kubeadm token create --print-join-command
+20. kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+Kube Join Master
+kubeadm join 10.3.24.7:6443 --token 9nugy4.1zzz7owoq8s4vpjt \
+--discovery-token-ca-cert-hash sha256:1f8eabb99445aca2b71950b87ef229f350620d427a68bbe2e7d85ad5911797bd \
+--control-plane --certificate-key 463e327553f24f75af59086c6b6ec0b420e5c3a335ae3b2a09971f8e45bc3809
+
+Kube Join Worker
+kubeadm join 10.3.24.7:6443 --token 9nugy4.1zzz7owoq8s4vpjt \
+--discovery-token-ca-cert-hash sha256:1f8eabb99445aca2b71950b87ef229f350620d427a68bbe2e7d85ad5911797bd
+```
+
+- [Official Kubernetes](https://kubernetes.io/id/docs/reference/kubectl/cheatsheet/)
+- [Mirantis](https://www.mirantis.com/blog/kubernetes-cheat-sheet/)
+- [Kubernete Multi Master](https://dockerlabs.collabnix.com/kubernetes/beginners/Install-and-configure-a-multi-master-Kubernetes-cluster-with-kubeadm.html)
+- https://serverfault.com/questions/1118051/failed-to-run-kubelet-validate-service-connection-cri-v1-runtime-api-is-not-im
+- https://faun.pub/setting-up-a-multi-master-kubernetes-cluster-with-kubeadm-and-haproxy-load-balancing-574aacfc5385
+
+## Install Nginx Ingress Kubernete
+
+```
+1. helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+2. helm repo update
+3. helm repo list
+6. helm search repo ingress-nginx --versions
+7. helm show values ingress-nginx/ingress-nginx --version 4.2.5 > ingress-nginx.yml
+8. search "hostNetwork: false" > "hostNetwork: true"
+9. search "hostPort: false" > "hostPort: true"
+10. search "kind: Deployment" > "kind: DaemonSet"
+11. kubectl create ns ingress-nginx
+12. helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --version 4.2.5 --values ingress-nginx.yml
+13. kubectl get all -n ingress-nginx
+
+Update Config Ingress Nginx
+1. helm upgrade ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --version 4.2.5 --values helm/ingress-nginx.yml
+2. helm list -n ingress-nginx (check version)
+```
+
+## Install Metric Kubernete
+
+```
+1. git clone https://github.com/kubernetes-sigs/metrics-server
+2. vi ./metrics-server/manifests/base/deployment.yaml
+3.  .....
+    .....
+    containers:
+          - name: metrics-server
+            image: gcr.io/k8s-staging-metrics-server/metrics-server:master
+            imagePullPolicy: IfNotPresent
+            # line 22 : add
+            command:
+              - /metrics-server
+              - --kubelet-insecure-tls
+              - --kubelet-preferred-address-types=InternalIP
+            args:
+              - --cert-dir=/tmp
+              - --secure-port=4443
+              - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+              - --kubelet-use-node-status-port
+    .....
+    .....
+5. kubectl apply -k ./metrics-server/manifests/base/
+6. kubectl get pods -n kube-system
+7. kubectl top node
+8. kubectl top pod
+```
+
+## Install Rancher
+
+- Reset Password Admin : $ kubectl -n cattle-system exec $(kubectl -n cattle-system get pods | grep ^rancher | head -n 1 | awk '{ print $1 }') reset-password
+
+```
+1. helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+2. kubectl create namespace cattle-system
+3. helm install rancher rancher-stable/rancher \
+  --namespace cattle-system \
+  --set hostname=k8s-rancher.pti-cosmetics.com \
+  --set replicas=3
+4. kubectl get secret --namespace cattle-system bootstrap-secret -o go-template='{{.data.bootstrapPassword|base64decode}}{{ "\n" }}'
+admin : JzCxLec7f15Z8plfwJ39
+```
+
+## Install Grafana Prometheus Operator Kubernete
+
+```
+1. git clone https://github.com/prometheus-operator/kube-prometheus.git
+2. git checkout v0.12.0
+3. cd kube-prometheus
+4. kubectl create -f manifests/setup
+5. kubectl get ns monitoring
+6. kubectl create -f manifests/
+7. kubectl get pods -n monitoring -w
+8. kubectl get svc -n monitoring
+```
+
+- https://computingforgeeks.com/setup-prometheus-and-grafana-on-kubernetes/
+
+## Install Prometheus Operator Kubernete
+
+```
+1. helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+2. helm repo update
+3. helm repo list
+4. kubectl create ns monitoring
+5. helm search repo prometheus-community/kube-prometheus-stack --versions
+6. helm show values prometheus-community/kube-prometheus-stack --version=48.1.2 > kube-prometheus-stack-values-48.1.2.yaml
+7. helm install prometheus prometheus-community/kube-prometheus-stack --namespace=monitoring --version=48.1.2 -f kube-prometheus-stack-values-48.1.2.yaml
+```
+
+- https://www.digitalocean.com/community/tutorials/how-to-set-up-digitalocean-kubernetes-cluster-monitoring-with-helm-and-prometheus-operator
+
+## Install Loki Kubernete
+
+```
+1. helm repo add grafana https://grafana.github.io/helm-charts
+2. helm repo update
+3. helm repo list
+4. kubectl create ns monitoring
+5. helm search repo grafana/loki-distributed --versions
+6. helm show values grafana/loki-distributed --version=0.69.16 > loki-values-0.69.16.yaml
+helm show values grafana/loki-distributed --version=0.69.16 > loki-values-0.69.16.yaml.ori
+7. helm install loki grafana/loki-distributed --namespace=monitoring --version=0.69.16 -f loki-values-0.69.16.yaml
+```
+
+- https://www.scaleway.com/en/docs/tutorials/manage-k8s-logging-loki/
+- https://stackoverflow.com/questions/73138278/why-my-loki-log-retention-is-not-working
+
+## Install Promtail Kubernete
+
+```
+1. helm repo add grafana https://grafana.github.io/helm-charts
+2. helm repo update
+3. helm repo list
+4. kubectl create ns monitoring
+5. helm search repo grafana/promtail --versions
+6. helm show values grafana/promtail --version=6.11.7 > promtail-values-6.11.7.yaml
+7. helm install promtail grafana/promtail --namespace=monitoring --version=6.11.7 -f promtail-values-6.11.7.yaml
+```
+
+- https://www.scaleway.com/en/docs/tutorials/manage-k8s-logging-loki/
+
+## Install Cephfs Kubernete
+
+```
+1. helm repo add ceph-csi https://ceph.github.io/csi-charts
+2. helm repo update
+3. helm repo list
+4. kubectl create ns ceph-csi-cephfs
+5. helm search repo ceph-csi/ceph-csi-cephfs --versions
+6. helm show values ceph-csi/ceph-csi-cephfs --version=3.8.0 > ceph-csi-cephfs-values-3.8.0.yaml
+   helm show values ceph-csi/ceph-csi-cephfs --version=3.9.0 > ceph-csi-cephfs-values-3.9.0.yaml
+7. helm install ceph-csi-cephfs ceph-csi/ceph-csi-cephfs --namespace=ceph-csi-cephfs --version=3.8.0 -f ceph-csi-cephfs-values-3.8.0.yaml
+   helm install ceph-csi-cephfs ceph-csi/ceph-csi-cephfs --namespace=ceph-csi-cephfs --version=3.9.0 -f ceph-csi-cephfs-values-3.9.0.yaml
+```
+
+Reference :
+
+- https://github.com/ceph/ceph-csi
+- https://github.com/ceph/ceph-csi/tree/v3.8.0/examples/cephfs
+
+## Install Cephfs Kubernete
+
+```
+1. helm repo add ceph-csi https://ceph.github.io/csi-charts
+2. helm repo update
+3. helm repo list
+4. kubectl create ns ceph-csi-cephfs
+5. helm search repo nfs-subdir-external-provisioner/nfs-subdir-external-provisioner --versions
+6. helm show values nfs-subdir-external-provisioner/nfs-subdir-external-provisioner --version=4.0.18 > nfs-subdir-external-provisioner-values-4.0.18.yaml
+7. helm install ceph-csi-cephfs ceph-csi/ceph-csi-cephfs --namespace=ceph-csi-cephfs --version=3.8.0 -f ceph-csi-cephfs-values-3.8.0.yaml
+```
+
+## K8S Label Node
+
+```
+kubectl label node <nodename> <labelname>-
+kubectl label node k8sworker-prem-tekno-1p node-role.kubernetes.io/worker=worker
+kubectl label node k8sworker-prem-tekno-2p node-role.kubernetes.io/worker=worker
+kubectl label node k8sworker-prem-tekno-3p node-role.kubernetes.io/worker=worker
+kubectl label node k8sworker-prem-tekno-4p node-role.kubernetes.io/worker=worker
+kubectl label node k8sworker-prem-tekno-5p node-role.kubernetes.io/worker=worker
+```
+
+## Install Cert Manager
+
+```
+1. helm repo add jetstack https://charts.jetstack.io
+2. helm repo update
+3. helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.5.3 --set installCRDs=true
+4. kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.crds.yaml
+5. helm list -n cert-manager
+```
+
+## Renewal Cert Kubernete API
+
+```
+cd /etc/kubernetes/pki/
+mv {apiserver.crt,apiserver-etcd-client.key,apiserver-kubelet-client.crt,front-proxy-ca.crt,front-proxy-client.crt,front-proxy-client.key,front-proxy-ca.key,apiserver-kubelet-client.key,apiserver.key,apiserver-etcd-client.crt} ~/
+kubeadm init phase certs all --apiserver-advertise-address <IP>
+cd /etc/kubernetes/
+mv {admin.conf,controller-manager.conf,kubelet.conf,scheduler.conf} ~/
+kubeadm init phase kubeconfig all
+reboot
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+```
+
+- https://stackoverflow.com/questions/56320930/renew-kubernetes-pki-after-expired
+
+https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability.yaml
+https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability-1.21+.yamlptiadmin@ansibleptiplaybooks-prem-tekno-1p:~/pti-playbooks/plays/setup-k8s-cluster$
