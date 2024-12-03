@@ -18,10 +18,10 @@ jobs:
           ls -la
 
       - name: Set kubeconfig
-        run: echo "${{ secrets.KUBECONFIG }}" > /home/docker-ubuntu/.kube/config
+        run: echo "${{ secrets.KUBECONFIG }}" > /home/docker-ubuntu/.kube/config.yaml
 
 
       - name: Apply Kubernetes manifests
         working-directory: /home/docker-ubuntu/my-k8s-project/
         run: |
-          kubectl --kubeconfig=/home/docker-ubuntu/.kube/config apply -f k8s/ --validate=false
+          kubectl --kubeconfig=/home/docker-ubuntu/.kube/config.yaml apply -f k8s/ --validate=false
