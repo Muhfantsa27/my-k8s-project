@@ -15,7 +15,7 @@ jobs:
       - name: Verify folder existence
         run: |
           echo "Current working directory: $(pwd)"
-          ls -l
+          ls -la
 
       - name: Apply Kubernetes manifests
         working-directory: my-k8s-project

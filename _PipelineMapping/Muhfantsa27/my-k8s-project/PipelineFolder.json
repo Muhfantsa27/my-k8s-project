@@ -1,0 +1,12 @@
+﻿{
+  "repositoryName": "Muhfantsa27/my-k8s-project",
+  "pipelineDirectory": "my-k8s-project",
+  "workspaceDirectory": "my-k8s-project/my-k8s-project",
+  "repositories": {
+    "Muhfantsa27/my-k8s-project": {
+      "repositoryPath": "my-k8s-project/my-k8s-project",
+      "lastRunOn": "12/03/2024 14:10:01 +07:00"
+    }
+  },
+  "lastRunOn": "12/03/2024 14:10:01 +07:00"
+}
