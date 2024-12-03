@@ -20,4 +20,4 @@ jobs:
       - name: Apply Kubernetes manifests
         working-directory: /home/docker-ubuntu/my-k8s-project/
         run: |
-          kubectl --kubeconfig=~/.kube/config apply -f k8s/
+          kubectl --kubeconfig=~/.kube/config.yaml apply -f k8s/
