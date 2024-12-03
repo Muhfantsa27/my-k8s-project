@@ -17,6 +17,10 @@ jobs:
           echo "Current working directory: $(pwd)"
           ls -la
 
+      - name: Set kubeconfig
+        run: echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+
+
       - name: Apply Kubernetes manifests
         working-directory: /home/docker-ubuntu/my-k8s-project/
         run: |
